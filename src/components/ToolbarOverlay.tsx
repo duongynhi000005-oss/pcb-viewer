@@ -11,6 +11,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react"
@@ -277,7 +278,10 @@ export const ToolbarOverlay = ({
     }
   }, [])
 
-  const availableLayers = getCopperLayerRefsFromElements(elements ?? [])
+  const availableLayers = useMemo(
+    () => getCopperLayerRefsFromElements(elements ?? []),
+    [elements],
+  )
 
   const processedLayers = availableLayers
 

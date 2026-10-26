@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { Matrix } from "transformation-matrix"
 import { applyToPoint, identity, inverse } from "transformation-matrix"
 import { useGlobalStore } from "../global-store"
+import { getScreenSnappingPoints } from "lib/get-screen-snapping-points"
 import { DimensionSnapGuides } from "./DimensionSnapGuides"
 
 interface Props {
@@ -219,21 +220,29 @@ export const DimensionOverlay = ({
   }, [elementBoundingBoxes, primitiveSnappingPoints])
 
   const snappingPointsWithScreen = useMemo(() => {
-    return snappingPoints.map((snap, index) => ({
-      ...snap,
-      id: `${index}-${snap.anchor}`,
-      screenPoint: applyToPoint(transform!, snap.point),
-    }))
-  }, [snappingPoints, transform])
+    return getScreenSnappingPoints({
+      snappingPoints,
+      realToScreenTransform: transform!,
+      isEnabled: measureToolArmed || dimensionToolStretching,
+    })
+  }, [snappingPoints, transform, measureToolArmed, dimensionToolStretching])
 
   const findSnap = useCallback(
     (rwPoint: { x: number; y: number }, disableSnap = false) => {
-      if (
-        !isSnappingEnabled ||
-        disableSnap ||
-        snapThresholdPx <= 0 ||
-        snappingPointsWithScreen.length === 0
-      ) {
+      if (!isSnappingEnabled || disableSnap || snapThresholdPx <= 0) {
+        return { point: rwPoint, id: null as string | null }
+      }
+
+      let screenSnappingPoints = snappingPointsWithScreen
+      if (screenSnappingPoints.length === 0) {
+        screenSnappingPoints = getScreenSnappingPoints({
+          snappingPoints,
+          realToScreenTransform: transform!,
+          isEnabled: true,
+        })
+      }
+
+      if (screenSnappingPoints.length === 0) {
         return { point: rwPoint, id: null as string | null }
       }
 
@@ -244,7 +253,7 @@ export const DimensionOverlay = ({
         point: { x: number; y: number }
       } | null = null
 
-      for (const snap of snappingPointsWithScreen) {
+      for (const snap of screenSnappingPoints) {
         const dx = snap.screenPoint.x - screenPoint.x
         const dy = snap.screenPoint.y - screenPoint.y
         const distance = Math.hypot(dx, dy)
@@ -265,7 +274,13 @@ export const DimensionOverlay = ({
 
       return { point: bestMatch.point, id: bestMatch.id }
     },
-    [isSnappingEnabled, snapThresholdPx, snappingPointsWithScreen, transform],
+    [
+      isSnappingEnabled,
+      snapThresholdPx,
+      snappingPoints,
+      snappingPointsWithScreen,
+      transform,
+    ],
   )
 
   useEffect(() => {
